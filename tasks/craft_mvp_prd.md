@@ -223,8 +223,8 @@ Instead of forcing users to learn another complex interface, we bring project ma
 ## Technical Architecture Overview
 
 ### Conversational AI Engine
-- **Primary Model**: Claude 3.5 Sonnet for complex reasoning and project understanding
-- **Fast Model**: Claude 3 Haiku for simple queries and real-time responses
+- **Primary Model**: Claude 4 Sonnet for complex reasoning and project understanding
+- **Fast Model**: Gemini Flash 2.5 for simple queries and real-time responses
 - **Embeddings**: OpenAI text-embedding-3-small for context retention and search
 
 ### Backend Infrastructure
