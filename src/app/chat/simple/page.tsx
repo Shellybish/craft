@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from 'react'
-import { Send, Plus, User, Paperclip, Mic } from 'lucide-react'
+import { Send, Plus, User, Paperclip, Mic, PanelLeft, PenBox } from 'lucide-react'
 
 interface Message {
   id: string
@@ -14,10 +14,15 @@ export default function SimpleChatPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [inputValue, setInputValue] = useState('')
   const [isTyping, setIsTyping] = useState(false)
+  const [sidebarVisible, setSidebarVisible] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  const toggleSidebar = () => {
+    setSidebarVisible(!sidebarVisible)
   }
 
   useEffect(() => {
@@ -61,7 +66,12 @@ export default function SimpleChatPage() {
   return (
     <div className="flex h-screen" style={{ backgroundColor: '#0f0f10' }}>
       {/* Sidebar */}
-      <div className="w-64 border-r flex flex-col" style={{ backgroundColor: '#1a1a1b', borderColor: '#27272a' }}>
+      <div 
+        className={`w-64 border-r flex flex-col transition-transform duration-400 ease-in-out ${
+          sidebarVisible ? 'translate-x-0' : '-translate-x-full'
+        }`} 
+        style={{ backgroundColor: '#1a1a1b', borderColor: '#27272a' }}
+      >
         <div className="p-4 border-b" style={{ borderColor: '#27272a' }}>
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
@@ -86,17 +96,23 @@ export default function SimpleChatPage() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
+      <div className={`flex-1 flex flex-col transition-all duration-400 ease-in-out ${
+        sidebarVisible ? 'ml-0' : '-ml-64'
+      }`}>
         {/* Header */}
         <div className="border-b p-4 flex items-center justify-between" style={{ borderColor: '#27272a' }}>
-          <div className="flex items-center gap-3">
-            <button className="flex items-center gap-2 px-3 py-1.5 text-gray-400 hover:text-white">
-              <Plus className="h-4 w-4" />
-              New Chat
+          <div className="flex items-center gap-1.5">
+            <button 
+              onClick={toggleSidebar}
+              className="p-2 text-gray-400 hover:text-white rounded-lg"
+            >
+              <PanelLeft className="h-5 w-5" strokeWidth={2.5} />
+            </button>
+            <button className="p-2 text-gray-400 hover:text-white rounded-lg">
+              <PenBox className="h-5 w-5" strokeWidth={2.5} />
             </button>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-400">Today</span>
             <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#27272a' }}>
               <User className="h-4 w-4 text-gray-400" />
             </div>
