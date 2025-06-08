@@ -15,6 +15,7 @@ export default function SimpleChatPage() {
   const [inputValue, setInputValue] = useState('')
   const [isTyping, setIsTyping] = useState(false)
   const [sidebarVisible, setSidebarVisible] = useState(true)
+  const [isInitialState, setIsInitialState] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = () => {
@@ -31,6 +32,11 @@ export default function SimpleChatPage() {
 
   const handleSendMessage = async () => {
     if (!inputValue.trim()) return
+
+    // Trigger the animation to move input to bottom
+    if (isInitialState) {
+      setIsInitialState(false)
+    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -119,94 +125,133 @@ export default function SimpleChatPage() {
           </div>
         </div>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto">
-          {messages.length === 0 ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center space-y-3 max-w-lg">
-                <div className="text-xl text-white">
-                  How can I help you today?
+        {/* Content Area */}
+        <div className="flex-1 flex flex-col">
+          {isInitialState ? (
+            /* Initial centered state */
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center space-y-8 max-w-2xl w-full px-6">
+                <div className="space-y-3">
+                  <div className="text-2xl text-white font-medium">
+                    Ready to take on the day?
+                  </div>
                 </div>
-                <div className="text-sm text-gray-400">
-                  I can help you create tasks, manage priorities, generate status updates, and set up projects.
+                <div className="transform transition-all duration-700 ease-in-out">
+                  <div className="flex items-end gap-3 w-full max-w-2xl">
+                    <div className="flex-1 relative">
+                      <div className="flex items-center w-full border rounded-xl" style={{ backgroundColor: '#141415', borderColor: '#27272a' }}>
+                        <button className="p-3 text-gray-400 hover:text-white">
+                          <Paperclip className="h-5 w-5" />
+                        </button>
+                        <input
+                          value={inputValue}
+                          onChange={(e) => setInputValue(e.target.value)}
+                          onKeyPress={handleKeyPress}
+                          placeholder="Ask about your projects, create tasks, or get status updates..."
+                          className="flex-1 min-h-[48px] px-2 py-3 bg-transparent focus:outline-none focus:ring-0 focus:border-transparent text-sm text-white placeholder-gray-400"
+                          style={{ outline: 'none', boxShadow: 'none' }}
+                          disabled={isTyping}
+                        />
+                        <button className="p-3 text-gray-400 hover:text-white">
+                          <Mic className="h-5 w-5" />
+                        </button>
+                        <button
+                          onClick={handleSendMessage}
+                          disabled={!inputValue.trim() || isTyping}
+                          className="p-3 text-gray-400 hover:text-white disabled:opacity-50"
+                        >
+                          <Send className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="text-xs text-gray-400">
+                  Press Enter to send
                 </div>
               </div>
             </div>
           ) : (
-            <div className="space-y-8 px-14 py-6 max-w-4xl mx-auto">
-              {messages.map((message) => (
-                <div key={message.id} className="flex w-full">
-                  <div className={`max-w-[85%] space-y-2 ${
-                    message.role === 'user' ? 'ml-auto' : 'mr-auto'
-                  }`}>
-                    {message.role === 'user' ? (
-                      <div className="rounded-2xl px-4 py-3" style={{ backgroundColor: '#141415', border: '1px solid #27272a' }}>
-                        <div className="text-sm text-white">
-                          {message.content}
+            /* Chat messages state */
+            <>
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto">
+                <div className="space-y-8 px-14 py-6 max-w-4xl mx-auto">
+                  {messages.map((message) => (
+                    <div key={message.id} className="flex w-full">
+                      <div className={`max-w-[85%] space-y-2 ${
+                        message.role === 'user' ? 'ml-auto' : 'mr-auto'
+                      }`}>
+                        {message.role === 'user' ? (
+                          <div className="rounded-2xl px-4 py-3" style={{ backgroundColor: '#141415', border: '1px solid #27272a' }}>
+                            <div className="text-sm text-white">
+                              {message.content}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            <div className="text-sm text-white leading-relaxed">
+                              {message.content}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {isTyping && (
+                    <div className="flex w-full">
+                      <div className="max-w-[85%] space-y-2 mr-auto">
+                        <div className="flex items-center space-x-1">
+                          <div className="flex space-x-1">
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.15s]"></div>
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.3s]"></div>
+                          </div>
+                          <span className="text-xs text-gray-400 ml-2">thinking...</span>
                         </div>
                       </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="text-sm text-white leading-relaxed">
-                          {message.content}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
+                  <div ref={messagesEndRef} />
                 </div>
-              ))}
-              {isTyping && (
-                <div className="flex w-full">
-                  <div className="max-w-[85%] space-y-2 mr-auto">
-                    <div className="flex items-center space-x-1">
-                      <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.15s]"></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.3s]"></div>
-                      </div>
-                      <span className="text-xs text-gray-400 ml-2">thinking...</span>
+              </div>
+
+              {/* Input at bottom */}
+              <div className="border-t p-6 transform transition-all duration-700 ease-in-out" style={{ borderColor: '#27272a' }}>
+                <div className="flex items-end gap-3 max-w-4xl mx-auto">
+                  <div className="flex-1 relative">
+                    <div className="flex items-center w-full border rounded-xl" style={{ backgroundColor: '#141415', borderColor: '#27272a' }}>
+                      <button className="p-3 text-gray-400 hover:text-white">
+                        <Paperclip className="h-5 w-5" />
+                      </button>
+                      <input
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        onKeyPress={handleKeyPress}
+                        placeholder="Ask about your projects, create tasks, or get status updates..."
+                        className="flex-1 min-h-[48px] px-2 py-3 bg-transparent focus:outline-none focus:ring-0 focus:border-transparent text-sm text-white placeholder-gray-400"
+                        style={{ outline: 'none', boxShadow: 'none' }}
+                        disabled={isTyping}
+                      />
+                      <button className="p-3 text-gray-400 hover:text-white">
+                        <Mic className="h-5 w-5" />
+                      </button>
+                      <button
+                        onClick={handleSendMessage}
+                        disabled={!inputValue.trim() || isTyping}
+                        className="p-3 text-gray-400 hover:text-white disabled:opacity-50"
+                      >
+                        <Send className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
                 </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-          )}
-        </div>
-
-        {/* Input */}
-        <div className="border-t p-6" style={{ borderColor: '#27272a' }}>
-          <div className="flex items-end gap-3 max-w-4xl mx-auto">
-            <div className="flex-1 relative">
-              <div className="flex items-center w-full border rounded-xl" style={{ backgroundColor: '#141415', borderColor: '#27272a' }}>
-                <button className="p-3 text-gray-400 hover:text-white">
-                  <Paperclip className="h-5 w-5" />
-                </button>
-                <input
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Ask about your projects, create tasks, or get status updates..."
-                  className="flex-1 min-h-[48px] px-2 py-3 bg-transparent focus:outline-none focus:ring-0 focus:border-transparent text-sm text-white placeholder-gray-400"
-                  style={{ outline: 'none', boxShadow: 'none' }}
-                  disabled={isTyping}
-                />
-                <button className="p-3 text-gray-400 hover:text-white">
-                  <Mic className="h-5 w-5" />
-                </button>
-                <button
-                  onClick={handleSendMessage}
-                  disabled={!inputValue.trim() || isTyping}
-                  className="p-3 text-gray-400 hover:text-white disabled:opacity-50"
-                >
-                  <Send className="h-4 w-4" />
-                </button>
+                <div className="text-xs text-gray-400 text-center mt-3">
+                  Press Enter to send
+                </div>
               </div>
-            </div>
-          </div>
-          <div className="text-xs text-gray-400 text-center mt-3">
-            Press Enter to send
-          </div>
+            </>
+          )}
         </div>
       </div>
     </div>
