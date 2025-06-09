@@ -1,5 +1,6 @@
 import { TaskParseResult, ExtractedTask } from './types';
 import { ContextAnalyzer } from './context-analyzer';
+import { AutoAssignmentEngine, TeamMember, TaskRequirements } from './auto-assignment';
 
 interface OpenRouterResponse {
   choices: Array<{
@@ -12,10 +13,12 @@ interface OpenRouterResponse {
 export class TaskParser {
   private mockMode: boolean;
   private contextAnalyzer: ContextAnalyzer;
+  private autoAssignmentEngine: AutoAssignmentEngine;
 
   constructor(mockMode: boolean = true) {
     this.mockMode = mockMode;
     this.contextAnalyzer = new ContextAnalyzer();
+    this.autoAssignmentEngine = new AutoAssignmentEngine(mockMode);
   }
 
   async parseMessage(
@@ -33,6 +36,86 @@ export class TaskParser {
     }
     
     return this.parseWithAI(message, context);
+  }
+
+  /**
+   * Parse message and get intelligent assignment recommendations
+   */
+  async parseMessageWithAssignments(
+    message: string,
+    context?: {
+      userId: string;
+      projectId?: string;
+      existingTasks?: any[];
+      teamMembers?: TeamMember[];
+      projects?: Array<{ id: string; name: string; client: string; keywords: string[] }>;
+    }
+  ): Promise<TaskParseResult & { assignmentRecommendations: any[] }> {
+    // First parse the message to extract tasks
+    const basicContext = context ? {
+      ...context,
+      teamMembers: context.teamMembers?.map(tm => ({
+        id: tm.id,
+        name: tm.name,
+        role: tm.role as string,
+        skills: tm.skills
+      }))
+    } : undefined;
+
+    const parseResult = await this.parseMessage(message, basicContext);
+    
+    // If we have team members and tasks were found, get assignment recommendations
+    if (context?.teamMembers && parseResult.tasks.length > 0) {
+      const assignmentRecommendations = await Promise.all(
+        parseResult.tasks.map(async (task) => {
+          try {
+            const taskRequirements: TaskRequirements = {
+              title: task.title,
+              description: task.description,
+              skillsRequired: this.extractSkillsFromTask(task),
+              priority: task.priority,
+              estimatedHours: task.estimatedHours || 4,
+              deadline: task.dueDate,
+              projectId: task.projectId,
+              complexity: this.determineTaskComplexity(task),
+              requiresCollaboration: this.requiresCollaboration(task),
+              clientFacing: this.isClientFacing(task)
+            };
+
+                         const recommendations = await this.autoAssignmentEngine.getAssignmentRecommendations(
+               taskRequirements,
+               context.teamMembers!,
+               {
+                 projectId: context.projectId,
+                 requesterId: context.userId
+               }
+             );
+
+            return {
+              taskId: task.title, // Use title as temporary ID
+              recommendations
+            };
+          } catch (error) {
+            console.error('Failed to get assignment recommendations for task:', task.title, error);
+            return {
+              taskId: task.title,
+              recommendations: [],
+              error: 'Failed to generate assignment recommendations'
+            };
+          }
+        })
+      );
+
+      return {
+        ...parseResult,
+        assignmentRecommendations
+      };
+    }
+
+    return {
+      ...parseResult,
+      assignmentRecommendations: []
+    };
   }
 
   async parseEmail(
@@ -393,15 +476,35 @@ Priority Guidelines:
     let confidence = 0.8;
     const suggestions: string[] = [];
 
-    // Mock task extraction based on common patterns
-    if (lowerMessage.includes('need to') || lowerMessage.includes('should')) {
-      tasks.push({
-        title: this.extractTaskTitle(message),
-        description: `Task extracted from: "${message.substring(0, 50)}..."`,
-        priority: this.determinePriority(lowerMessage),
-        tags: this.extractTags(lowerMessage),
-        estimatedHours: this.estimateHours(lowerMessage),
-        confidence: 0.85
+    console.log('🔍 Mock parser analyzing message:', message);
+    console.log('🔍 Looking for task indicators in:', lowerMessage);
+
+    // Enhanced task detection patterns
+    const taskIndicators = [
+      'need to', 'should', 'have to', 'must', 'create', 'build', 'design', 
+      'update', 'fix', 'implement', 'develop', 'review', 'complete', 'finish',
+      'prepare', 'setup', 'configure', 'test', 'deploy', 'write', 'draft'
+    ];
+
+    const hasTaskIndicator = taskIndicators.some(indicator => lowerMessage.includes(indicator));
+    console.log('🔍 Has task indicator:', hasTaskIndicator);
+
+    if (hasTaskIndicator) {
+      // Try to split message into multiple tasks if "and" is present
+      const segments = message.split(/\s+and\s+/i);
+      console.log('🔍 Message segments:', segments);
+      
+      segments.forEach((segment, index) => {
+        if (segment.trim()) {
+          tasks.push({
+            title: this.extractTaskTitle(segment.trim()),
+            description: `Task extracted from: "${segment.substring(0, 50)}..."`,
+            priority: this.determinePriority(lowerMessage),
+            tags: this.extractTags(lowerMessage),
+            estimatedHours: this.estimateHours(lowerMessage),
+            confidence: 0.85
+          });
+        }
       });
     }
 
@@ -447,6 +550,8 @@ Priority Guidelines:
       }
     }
 
+    console.log('📊 Mock parser result:', { tasks: tasks.length, confidence, suggestions });
+    
     return {
       tasks,
       confidence,
@@ -634,5 +739,122 @@ Priority Guidelines:
     }
     
     return undefined;
+  }
+
+  /**
+   * Extract skills required for a task based on its content
+   */
+  private extractSkillsFromTask(task: ExtractedTask): string[] {
+    const skills: string[] = [];
+    const text = `${task.title} ${task.description || ''}`.toLowerCase();
+    
+    // Design skills
+    if (text.includes('design') || text.includes('mockup') || text.includes('visual') || text.includes('ui')) {
+      skills.push('design');
+    }
+    if (text.includes('figma') || text.includes('sketch') || text.includes('adobe')) {
+      skills.push('figma');
+    }
+    if (text.includes('branding') || text.includes('logo') || text.includes('brand')) {
+      skills.push('branding');
+    }
+    
+    // Development skills
+    if (text.includes('develop') || text.includes('code') || text.includes('implement') || text.includes('build')) {
+      skills.push('development');
+    }
+    if (text.includes('react') || text.includes('javascript') || text.includes('typescript')) {
+      skills.push('react', 'typescript');
+    }
+    if (text.includes('api') || text.includes('backend') || text.includes('server')) {
+      skills.push('backend', 'nodejs');
+    }
+    
+    // Content skills
+    if (text.includes('content') || text.includes('copy') || text.includes('writing')) {
+      skills.push('copywriting');
+    }
+    
+    // Project management skills
+    if (text.includes('coordinate') || text.includes('manage') || text.includes('plan')) {
+      skills.push('project-management');
+    }
+    
+    // Extract from tags
+    task.tags.forEach(tag => {
+      if (['design', 'development', 'content', 'marketing'].includes(tag)) {
+        skills.push(tag);
+      }
+    });
+    
+    return [...new Set(skills)]; // Remove duplicates
+  }
+
+  /**
+   * Determine task complexity based on content analysis
+   */
+  private determineTaskComplexity(task: ExtractedTask): 'simple' | 'medium' | 'complex' {
+    const text = `${task.title} ${task.description || ''}`.toLowerCase();
+    const hours = task.estimatedHours || 4;
+    
+    // Complex indicators
+    if (hours > 16 || text.includes('complex') || text.includes('major') || text.includes('full') || text.includes('complete')) {
+      return 'complex';
+    }
+    
+    // Simple indicators
+    if (hours <= 2 || text.includes('quick') || text.includes('simple') || text.includes('minor') || text.includes('small')) {
+      return 'simple';
+    }
+    
+    // Check for complexity keywords
+    const complexKeywords = ['architecture', 'system', 'integration', 'migration', 'optimization'];
+    const simpleKeywords = ['review', 'update', 'fix', 'check', 'edit'];
+    
+    if (complexKeywords.some(keyword => text.includes(keyword))) {
+      return 'complex';
+    }
+    
+    if (simpleKeywords.some(keyword => text.includes(keyword))) {
+      return 'simple';
+    }
+    
+    return 'medium';
+  }
+
+  /**
+   * Determine if task requires collaboration
+   */
+  private requiresCollaboration(task: ExtractedTask): boolean {
+    const text = `${task.title} ${task.description || ''}`.toLowerCase();
+    
+    // Collaboration indicators
+    const collaborationKeywords = [
+      'coordinate', 'collaborate', 'meeting', 'team', 'discuss', 'review', 
+      'feedback', 'approval', 'stakeholder', 'client', 'together'
+    ];
+    
+    return collaborationKeywords.some(keyword => text.includes(keyword)) ||
+           task.tags.includes('meeting') ||
+           task.tags.includes('review') ||
+           task.tags.includes('client');
+  }
+
+  /**
+   * Determine if task is client-facing
+   */
+  private isClientFacing(task: ExtractedTask): boolean {
+    const text = `${task.title} ${task.description || ''}`.toLowerCase();
+    
+    // Client-facing indicators
+    const clientKeywords = [
+      'client', 'customer', 'presentation', 'delivery', 'demo', 'meeting',
+      'review', 'approval', 'feedback', 'show', 'present'
+    ];
+    
+    return clientKeywords.some(keyword => text.includes(keyword)) ||
+           task.tags.includes('client') ||
+           task.tags.includes('presentation') ||
+           task.tags.includes('delivery');
   }
 } 

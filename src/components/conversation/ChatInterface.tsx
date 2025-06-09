@@ -7,12 +7,15 @@ import { Input } from '@/components/ui/input'
 import { Send, Plus } from 'lucide-react'
 import { ChatMessage } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
+import { TaskConfirmation } from '@/components/tasks/TaskConfirmation'
+import { TaskParseResult, ExtractedTask } from '@/lib/ai/types'
 
 export interface Message {
   id: string
   content: string
   role: 'user' | 'assistant'
   timestamp: Date
+  taskParseResult?: TaskParseResult
 }
 
 interface ChatInterfaceProps {
@@ -24,6 +27,59 @@ export function ChatInterface({ className, onNewChat }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [inputValue, setInputValue] = useState('')
   const [isTyping, setIsTyping] = useState(false)
+  const [showingTaskConfirmation, setShowingTaskConfirmation] = useState<string | null>(null)
+  // Simple client-side task parser function
+  const parseTasksFromMessage = (message: string): TaskParseResult => {
+    console.log('🏗️ CLIENT: Parsing tasks from message:', message);
+    
+    const lowerMessage = message.toLowerCase();
+    const tasks: ExtractedTask[] = [];
+    
+    // Enhanced task detection patterns
+    const taskIndicators = [
+      'need to', 'should', 'have to', 'must', 'create', 'build', 'design', 
+      'update', 'fix', 'implement', 'develop', 'review', 'complete', 'finish',
+      'prepare', 'setup', 'configure', 'test', 'deploy', 'write', 'draft'
+    ];
+
+    const hasTaskIndicator = taskIndicators.some(indicator => lowerMessage.includes(indicator));
+    console.log('🔍 CLIENT: Has task indicator:', hasTaskIndicator);
+
+    if (hasTaskIndicator) {
+      // Split message into multiple tasks if "and" is present
+      const segments = message.split(/\s+and\s+/i);
+      console.log('🔍 CLIENT: Message segments:', segments);
+      
+      segments.forEach((segment) => {
+        if (segment.trim()) {
+          // Extract task title (first meaningful part)
+          const title = segment.trim().replace(/^(I |we |you |they )(need to |should |have to |must )/i, '').trim();
+          const cleanTitle = title.charAt(0).toUpperCase() + title.slice(1);
+          
+          tasks.push({
+            title: cleanTitle || 'New task',
+            description: `Task extracted from: "${segment.substring(0, 50)}..."`,
+            priority: lowerMessage.includes('urgent') || lowerMessage.includes('asap') ? 'urgent' : 
+                     lowerMessage.includes('deadline') || lowerMessage.includes('important') ? 'high' : 'medium',
+            tags: ['created-from-chat'],
+            estimatedHours: 2,
+            confidence: 0.85
+          });
+        }
+      });
+    }
+
+    const result: TaskParseResult = {
+      tasks,
+      confidence: tasks.length > 0 ? 0.8 : 0.2,
+      suggestions: tasks.length > 0 ? 
+        [`Found ${tasks.length} potential task${tasks.length > 1 ? 's' : ''}`] : 
+        ["I didn't detect specific tasks. Try phrases like 'I need to...' or 'We should...'"]
+    };
+    
+    console.log('📊 CLIENT: Parse result:', result);
+    return result;
+  }
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -50,7 +106,37 @@ export function ChatInterface({ className, onNewChat }: ChatInterfaceProps) {
     setIsTyping(true)
 
     try {
-      // Make actual API call to chat endpoint
+      // First, try to parse tasks from the message
+      console.log('🔍 CLIENT: Parsing message for tasks:', userMessage.content);
+      
+      const taskParseResult = parseTasksFromMessage(userMessage.content);
+
+      // If tasks were found with sufficient confidence, show task confirmation
+      const hasTask = taskParseResult.tasks.length > 0;
+      const hasConfidence = taskParseResult.confidence > 0.3;
+      console.log('🔍 CLIENT: Task check:', { hasTask, hasConfidence, taskCount: taskParseResult.tasks.length, confidence: taskParseResult.confidence });
+      
+      if (hasTask && hasConfidence) {
+        console.log('✅ CLIENT: Showing task confirmation UI');
+        const taskMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          content: `I found ${taskParseResult.tasks.length} task${taskParseResult.tasks.length !== 1 ? 's' : ''} in your message. Please review and confirm:`,
+          role: 'assistant',
+          timestamp: new Date(),
+          taskParseResult
+        }
+
+        console.log('📝 CLIENT: Task message created:', taskMessage);
+        setMessages(prev => [...prev, taskMessage])
+        setShowingTaskConfirmation(taskMessage.id)
+        console.log('🎯 CLIENT: Set showingTaskConfirmation to:', taskMessage.id);
+        setIsTyping(false)
+        return // This should prevent the API call
+      }
+      
+      console.log('ℹ️ CLIENT: No tasks found or low confidence, proceeding with normal chat');
+
+      // If no tasks found or low confidence, proceed with normal conversation
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -77,7 +163,7 @@ export function ChatInterface({ className, onNewChat }: ChatInterfaceProps) {
 
       setMessages(prev => [...prev, aiMessage])
     } catch (error) {
-      console.error('Failed to get AI response:', error)
+      console.error('Failed to process message:', error)
       
       // Fallback error message
       const errorMessage: Message = {
@@ -90,6 +176,34 @@ export function ChatInterface({ className, onNewChat }: ChatInterfaceProps) {
     } finally {
       setIsTyping(false)
     }
+  }
+
+  const handleTaskApproval = async (approvedTasks: ExtractedTask[]) => {
+    setShowingTaskConfirmation(null)
+    
+    // Here we would normally save the tasks to the database
+    // For now, just show a success message
+    const successMessage: Message = {
+      id: Date.now().toString(),
+      content: `Great! I've created ${approvedTasks.length} task${approvedTasks.length !== 1 ? 's' : ''} for you:\n\n${approvedTasks.map(task => `• ${task.title}`).join('\n')}\n\nIs there anything else I can help you with?`,
+      role: 'assistant',
+      timestamp: new Date()
+    }
+    
+    setMessages(prev => [...prev, successMessage])
+  }
+
+  const handleTaskRejection = () => {
+    setShowingTaskConfirmation(null)
+    
+    const rejectionMessage: Message = {
+      id: Date.now().toString(),
+      content: "No problem! Those tasks have been discarded. Feel free to rephrase or ask me something else.",
+      role: 'assistant',
+      timestamp: new Date()
+    }
+    
+    setMessages(prev => [...prev, rejectionMessage])
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -132,9 +246,30 @@ export function ChatInterface({ className, onNewChat }: ChatInterfaceProps) {
           </div>
         ) : (
           <div className="space-y-8 p-6 max-w-4xl mx-auto">
-            {messages.map((message) => (
-              <ChatMessage key={message.id} message={message} />
-            ))}
+            {messages.map((message) => {
+              const shouldShowConfirmation = message.taskParseResult && showingTaskConfirmation === message.id;
+              console.log(`🎨 CLIENT: Rendering message ${message.id}:`, { 
+                hasTaskParseResult: !!message.taskParseResult, 
+                showingTaskConfirmation, 
+                shouldShowConfirmation,
+                taskCount: message.taskParseResult?.tasks?.length || 0
+              });
+              
+              return (
+                <div key={message.id}>
+                  <ChatMessage message={message} />
+                  {shouldShowConfirmation && (
+                    <div className="mt-4">
+                      <TaskConfirmation
+                        parseResult={message.taskParseResult!}
+                        onApprove={handleTaskApproval}
+                        onReject={handleTaskRejection}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
             {isTyping && <TypingIndicator />}
             <div ref={messagesEndRef} />
           </div>
