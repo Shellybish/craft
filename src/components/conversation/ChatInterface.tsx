@@ -49,17 +49,47 @@ export function ChatInterface({ className, onNewChat }: ChatInterfaceProps) {
     setInputValue('')
     setIsTyping(true)
 
-    // Simulate AI response (replace with actual API call)
-    setTimeout(() => {
+    try {
+      // Make actual API call to chat endpoint
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: userMessage.content,
+          conversationId: `conv_${Date.now()}`,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`)
+      }
+
+      const data = await response.json()
+
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: "I understand you'd like to create some tasks. Let me help you with that. What specific tasks would you like to add to your project?",
+        content: data.message,
         role: 'assistant',
         timestamp: new Date()
       }
+
       setMessages(prev => [...prev, aiMessage])
+    } catch (error) {
+      console.error('Failed to get AI response:', error)
+      
+      // Fallback error message
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: "I'm sorry, I'm having trouble processing your request right now. Please try again.",
+        role: 'assistant',
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, errorMessage])
+    } finally {
       setIsTyping(false)
-    }, 1500)
+    }
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {

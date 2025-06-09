@@ -26,6 +26,13 @@ export default function SimpleChatPage() {
     setSidebarVisible(!sidebarVisible)
   }
 
+  const startNewChat = () => {
+    setMessages([])
+    setInputValue('')
+    setIsInitialState(true)
+    setIsTyping(false)
+  }
+
   useEffect(() => {
     scrollToBottom()
   }, [messages])
@@ -49,17 +56,67 @@ export default function SimpleChatPage() {
     setInputValue('')
     setIsTyping(true)
 
-    // Simulate AI response
-    setTimeout(() => {
+    try {
+      // Add minimum thinking time for better UX
+      const startTime = Date.now()
+      const minThinkingTime = 1000 // 1 second minimum
+
+      // Make actual API call to chat endpoint
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: userMessage.content,
+          conversationId: `conv_${Date.now()}`,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      // Ensure minimum thinking time has elapsed
+      const elapsedTime = Date.now() - startTime
+      const remainingTime = Math.max(0, minThinkingTime - elapsedTime)
+      
+      if (remainingTime > 0) {
+        await new Promise(resolve => setTimeout(resolve, remainingTime))
+      }
+
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: "I understand you'd like to create some tasks. Let me help you with that. What specific tasks would you like to add to your project?",
+        content: data.message,
         role: 'assistant',
         timestamp: new Date()
       }
+
       setMessages(prev => [...prev, aiMessage])
+    } catch (error) {
+      console.error('Failed to get AI response:', error)
+      
+      // Ensure minimum thinking time even for errors
+      const elapsedTime = Date.now() - Date.now()
+      const remainingTime = Math.max(0, 1000 - elapsedTime)
+      
+      if (remainingTime > 0) {
+        await new Promise(resolve => setTimeout(resolve, remainingTime))
+      }
+      
+      // Fallback error message
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: "I'm sorry, I'm having trouble processing your request right now. Please try again.",
+        role: 'assistant',
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, errorMessage])
+    } finally {
       setIsTyping(false)
-    }, 1500)
+    }
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -67,6 +124,18 @@ export default function SimpleChatPage() {
       e.preventDefault()
       handleSendMessage()
     }
+  }
+
+  const formatMessage = (content: string) => {
+    // Split by lines and format headers (lines ending with :)
+    const lines = content.split('\n')
+    return lines.map((line, index) => {
+      const trimmedLine = line.trim()
+      if (trimmedLine.endsWith(':') && !trimmedLine.startsWith('•') && !trimmedLine.match(/^\d+\)/)) {
+        return <div key={index} className="font-semibold text-white mt-4 mb-2">{trimmedLine}</div>
+      }
+      return <div key={index}>{line}</div>
+    })
   }
 
   return (
@@ -78,7 +147,7 @@ export default function SimpleChatPage() {
         }`} 
         style={{ backgroundColor: '#1a1a1b', borderColor: '#27272a' }}
       >
-        <div className="p-4 border-b" style={{ borderColor: '#27272a' }}>
+        <div className="px-4 py-4 border-b h-[73px] flex items-center" style={{ borderColor: '#27272a' }}>
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
               <span className="text-black font-bold text-sm">C</span>
@@ -106,7 +175,7 @@ export default function SimpleChatPage() {
         sidebarVisible ? 'ml-0' : '-ml-64'
       }`}>
         {/* Header */}
-        <div className="border-b p-4 flex items-center justify-between" style={{ borderColor: '#27272a' }}>
+        <div className="border-b px-4 py-4 h-[73px] flex items-center justify-between" style={{ borderColor: '#27272a' }}>
           <div className="flex items-center gap-1.5">
             <button 
               onClick={toggleSidebar}
@@ -114,7 +183,11 @@ export default function SimpleChatPage() {
             >
               <PanelLeft className="h-5 w-5" strokeWidth={2.5} />
             </button>
-            <button className="p-2 text-gray-400 hover:text-white rounded-lg">
+            <button 
+              onClick={startNewChat}
+              className="p-2 text-gray-400 hover:text-white rounded-lg"
+              title="Start new chat"
+            >
               <PenBox className="h-5 w-5" strokeWidth={2.5} />
             </button>
           </div>
@@ -191,7 +264,7 @@ export default function SimpleChatPage() {
                         ) : (
                           <div className="space-y-3">
                             <div className="text-sm text-white leading-relaxed">
-                              {message.content}
+                              {formatMessage(message.content)}
                             </div>
                           </div>
                         )}

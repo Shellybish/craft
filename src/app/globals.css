@@ -40,3 +40,16 @@ textarea:focus-visible {
   outline: 2px solid #0066cc;
   outline-offset: 2px;
 }
+
+/* AI Response Formatting */
+.formatted-response {
+  /* Enhanced styling for AI responses */
+}
+
+/* Style lines that are section headers (end with :) */
+.formatted-response .section-header {
+  font-weight: 600;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  color: #ffffff;
+}
