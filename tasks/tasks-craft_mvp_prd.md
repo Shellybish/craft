@@ -86,8 +86,8 @@
 
 - [ ] 2.0 Implement conversational task creation feature
   - [x] 2.1 Design and implement core chat interface with intuitive message bubbles and typing indicators
-  - [ ] 2.2 Create natural language task parser that extracts actionable items from free-form text
-  - [ ] 2.3 Build AI logic for understanding context clues (urgency, assignee, deadlines, project association)
+  - [x] 2.2 Create natural language task parser that extracts actionable items from free-form text
+  - [x] 2.3 Build AI logic for understanding context clues (urgency, assignee, deadlines, project association)
   - [ ] 2.4 Implement intelligent auto-assignment based on team roles and workload analysis
   - [ ] 2.5 Create task confirmation UI with one-click editing and approval workflow
   - [ ] 2.6 Design visual task cards with clear hierarchy, status indicators, and context preservation

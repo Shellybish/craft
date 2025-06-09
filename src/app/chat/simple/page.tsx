@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from 'react'
-import { Send, Plus, User, Paperclip, Mic, PanelLeft, PenBox } from 'lucide-react'
+import { Send, Plus, User, Paperclip, Mic, PanelLeft, PenBox, MessageCircle, CheckSquare, FolderOpen } from 'lucide-react'
 
 interface Message {
   id: string
@@ -89,13 +89,13 @@ export default function SimpleChatPage() {
         <div className="flex-1 p-4">
           <nav className="space-y-2">
             <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-white" style={{ backgroundColor: '#27272a' }}>
-              <span>💬</span> Chat
+              <MessageCircle className="h-4 w-4" /> Chat
             </a>
             <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700">
-              <span>✅</span> Tasks
+              <CheckSquare className="h-4 w-4" /> Tasks
             </a>
             <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700">
-              <span>📊</span> Projects
+              <FolderOpen className="h-4 w-4" /> Projects
             </a>
           </nav>
         </div>
